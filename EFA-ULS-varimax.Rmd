@@ -1,0 +1,485 @@
+---
+title: "Dokumentation der explorativen Faktorenanalysen"
+output:
+  html_notebook:
+    code_folding: hide
+  html_document:
+    df_print: paged
+---
+
+<style>
+  h1 { margin-top: 40px; }
+  h2 { font-size: 25px;	margin-top: 25px; margin-bottom: 20px;}
+  h3 { font-size: 16px;	margin-top: 25px; margin-bottom: 5px;}
+  body, h1, h2, h3, h4 {font-family: "Arial";}
+  body {font-size: 18px;}
+</style>
+
+## „Neutral vermitteln“ oder „ermächtigend berichten“? Strukturelle Unterschiede von journalistischem Rollenselbstverständnis und bevölkerungsseitigen Erwartungen
+
+Louise Sprengelmeyer / Julius Reimer / Hannah Immler / Wiebke Loosen / Julia Behre / Sascha Hölig
+
+27. Juli 2022
+
+```{r include=FALSE}
+rm(list=ls())
+```
+
+```{r include=FALSE}
+library(needs)
+needs(haven, dplyr, labelled, ggplot2, kableExtra, psych, ggcorrplot, tibble)
+```
+
+```{r include=FALSE}
+setwd("~/Desktop/Paper-RoJouBevRep")
+```
+
+```{r include=FALSE}
+df <- read_spss("JPubRepFusionWoJ.sav")
+```
+
+```{r include=FALSE}
+ri <- df %>%
+  distinct(ID, .keep_all = T) %>%
+  select(3:4, 13:33)
+```
+
+```{r include=FALSE}
+group <- ri %>%
+  distinct(dataset) %>%
+  mutate(group = case_when(dataset == 1 ~ "Bürger*innen",
+                           dataset == 2 ~ "Journalist*innen",
+                           TRUE ~ "Kontrolle"))
+```
+
+```{r include=FALSE}
+label_list <- labelled::var_label(ri)
+label <- data.frame(Variable = names(label_list), Label_eng = unlist(label_list))
+rm(label_list)
+label <- label %>%
+  filter(Variable != "dataset" & Variable != "fusionweight") %>%
+  mutate_if(is.factor, as.character) %>%
+  mutate(
+    Label = case_when(
+      Label_eng == "Be a detached observer." ~ "Ein unparteiischer Beobachter sein",
+      Label_eng == "Report things as they are." ~ "Dinge so berichten, wie sie sind",
+      Label_eng == "Provide analysis of current affairs." ~ "Aktuelles Geschehen einordnen und analysieren",
+      Label_eng == "Monitor and scrutinize political leaders." ~ "Die Regierung kontrollieren",
+      Label_eng == "Monitor and scrutinize business." ~ "Die Wirtschaft kontrollieren",
+      Label_eng == "Set the political agenda." ~ "Die politische Tagesordnung bestimmen",
+      Label_eng == "Influence public opinion." ~ "Die öffentliche Meinung beeinflussen",
+      Label_eng == "Advocate for social change." ~ "Für sozialen Wandel eintreten",
+      Label_eng == "Be an adversary of the government." ~ "Ein Gegengewicht zur Regierung bilden",
+      Label_eng == "Support national development." ~ "Nationale Entwicklung unterstützen",
+      Label_eng == "Convey a positive image of political leadership." ~ "Ein positives Bild der Regierung vermitteln",
+      Label_eng == "Support government policy." ~ "Regierungspolitik unterstützen",
+      Label_eng == "Provide entertainment and relaxation." ~ "Unterhaltung und Entspannung bieten",
+      Label_eng == "Provide the kind of news that attracts the largest audience." ~ "Inhalte anbieten, die ein möglichst großes Publikum anziehen",
+      Label_eng == "Provide advice, orientation and direction for daily life." ~ "Rat, Orientierung und Hilfestellung für den Alltag bieten",
+      Label_eng == "Provide information people need to make political decisions." ~ "Informationen vermitteln, die Menschen zu politischen Entscheidungen befähigen",
+      Label_eng == "Motivate people to participate in political activity." ~ "Menschen zur Teilhabe am politischen Geschehen motivieren",
+      Label_eng == "Let people express their views." ~ "Den Menschen die Möglichkeit geben, ihre Ansichten zu artikulieren",
+      Label_eng == "Educate the audience." ~ "Das Publikum bilden",
+      Label_eng == "Tell stories about the world." ~ "Als Erzähler die Welt in Geschichten vermitteln",
+      Label_eng == "Promote tolerance and cultural diversity." ~ "Toleranz und kulturelle Vielfalt fördern",
+      TRUE ~ "Kontrolle"
+    )
+  )
+```
+
+Ergänzend zu [unserem Aufsatz](https://www.nomos-elibrary.de/10.5771/1615-634X-2022-3-213/neutral-vermitteln-oder-ermaechtigend-berichten-strukturelle-unterschiede-von-journalistischem-rollenselbstverstaendnis-und-bevoelkerungsseitigen-erwartungen-jahrgang-70-2022-heft-3?page=1) dokumentieren wir hier im Detail, wie wir bei den beiden **explorativen Faktorenanalysen** vorgegangen sind. In unserer Studie vergleichen wir journalistisches Rollenselbstverständnis und bevölkerungsseitige Erwartungen und zeigen strukturelle Unterschiede.
+
+Für beide Gruppen, Journalist&ast;innen und Bürger&ast;innen in Deutschland, betrachten wir journalistische Rollenitems und -facetten explorativ. Dabei legen wir den Fokus auf latente Dimensionen, also Rollen, zu denen sich die Items bündeln lassen. Wir kommentieren die einzelnen Analyseschritte für die Gruppe der Journalist&ast;innen, da wir diese zuerst betrachten. Danach stellen wir das faktorenanalytische Modell der Bevölkerung vor. Hier gestaltet sich unser Vorgehen identisch -- die Bezeichnung der Faktoren mit von uns gefundenen Labeln ausgenommen. Bevölkerungsseitig zeigen wir daher direkt die Ergebnisse der einzelnen Schritte.
+
+Grundsätzlich basiert unsere Analyse auf zwei Datensätzen, die unterschiedliche Gruppen von Befragten abbilden: zum einen Journalist&ast;innen in Deutschland, zum anderen deutsche Bürger&ast;innen. Die beiden repräsentativen Umfragen eint, dass beide Gruppen die Wichtigkeit von 21 identisch formulierten Rollenitems -- übernommen aus der *Worlds of Journalism*-Studie (Hanitzsch et al. 2019) -- auf einer 5-Punkte-Likert-Skala von "unwichtig" ("1") bis "extrem wichtig" ("5") bewerteten. Diese fünffach abgestuften Antwortkategorien erlauben uns, die empirisch ordinalskalierten Variablen in der statistischen Anwendung unter Vorbehalt als quasi-metrisch zu behandeln. Eine solche Interpretation ist möglich, da „die Abstände zwischen den Antworten semantisch und durch numerische Wertzuweisung als gleich groß interpretiert werden“ (Völkl & Korb 2018: 20) können. Die folgenden Rollenitems betrachten wir:
+
+```{r echo=FALSE}
+items_viz <- label %>%
+  select(Label, Variable) %>%
+  rename("Rollenitem" = Label, "Abkürzung" = Variable)
+rownames(items_viz) <- NULL
+kable(items_viz, format = "html", escape = FALSE) %>%
+  kable_styling(bootstrap_options = c("condensed", "responsive"))
+```
+
+Eine Voraussetzung für faktorenanalytische Berechnungen ist, dass die Daten vollständig sind und dementsprechend keine Antwortausfälle vorkommen (Fricker et al. 2012). Der fusionierte Datensatz umfasst insgesamt 1.807 Fälle, Beobachtungen mit fehlenden Werten noch eingeschlossen: 775 Journalist&ast;innen und 1032 Bürger&ast;innen. Wir haben uns dazu entschieden, Fälle listenweise auszuschließen, sodass nur noch vollständige Beobachtungen vorliegen. Fehlende Werte haben wir in dieser Analyse folglich nicht über Imputationsverfahren vervollständigt. Denn auch nach Ausgrenzung betroffener Beobachtungen sind in beiden Gruppen – Journalist&ast;innen wie Bürger&ast;innen – noch 88 Prozent der Fälle vorhanden. Das finale Sample umfasst 689 Journalist&ast;innen, bevölkerungsseitig sind noch 905 Fälle berücksichtigt. Derartige Stichprobengrößen eignen sich in Anlehnung an Bühner (2011) sowie Comrey und Lee (1992) sehr gut für faktorenanalytische Betrachtungen, da jeweils mehr als 500 Beobachtungen vorliegen.
+
+```{r warning=FALSE, include=FALSE}
+cases_all <- ri %>%
+  group_by(dataset) %>%
+  add_count %>%
+  distinct(dataset, n) %>%
+  mutate(note = "alle Beobachtungen")
+cases_all <- left_join(group, cases_all, by = "dataset")
+
+cases_na.omit <- na.omit(ri) %>%
+  group_by(dataset) %>%
+  add_count %>%
+  distinct(dataset, n) %>%
+  mutate(note = "nur vollständige Fälle")
+cases_na.omit <- left_join(group, cases_na.omit, by = "dataset")
+cases <- bind_rows(cases_all, cases_na.omit)
+rm(cases_all, cases_na.omit)
+```
+
+```{r echo=FALSE, include=FALSE}
+cases_viz <- ggplot(cases, aes(x = group, y = n, fill = note)) +
+  geom_col(position = position_dodge(width = 0.8), width = 0.6) +
+  geom_text(aes(label = n), position = position_dodge(0.8),
+            vjust = 0.5, hjust = 2, color = "white", size = 5, family = "Calibri") +
+  theme_classic(base_family = "Calibri") +
+  coord_flip() +
+  theme(legend.title = element_blank()) +
+  theme(legend.position="top") +
+  xlab("") + ylab("absolute Häufigkeit der Fälle") +
+  scale_fill_manual(values = c("#3ec4ae", "#fad60c"))
+ggsave("cases.png", cases_viz, device = "png", width = 7, height = 5)
+```
+
+<img src="cases.png" width="700" height="500"/>
+
+```{r include=FALSE}
+total <- cases %>%
+  group_by(note) %>%
+  mutate(sum = sum(n)) %>%
+  distinct(note, sum)
+```
+
+```{r include=FALSE}
+aud_per <- round(100*905/1032, 2)
+aud_per
+```
+
+```{r include=FALSE}
+jou_per <- round(100*689/775, 2)
+jou_per
+```
+
+```{r include=FALSE}
+rm(cases, cases_viz, total, aud_per, jou_per)
+```
+
+# Journalist*innen
+
+```{r}
+jou <- ri %>% filter(dataset == 2)
+val_labels(jou) <- NULL
+jou_na.omit <- na.omit(jou)
+jou_cl <- jou_na.omit %>% select(3:23)
+```
+
+In einem ersten Schritt erstellen wir eine gewichtete Korrelationsmatrix. Alle bivariaten Korrelationen weisen Werte zwischen 0,30 und 0,90 auf – sowohl aufseiten der Journalist&ast;innen als auch der Bürger&ast;innen. Die nachfolgende Abbildung zeigt eine Heatmap, in der die Korrelationen farblich visualisiert sind. Positive Werte sind gelb schattiert, negative Korrelation sind in türkisen Tönen dargestellt. Je größer der absolute Wert der Korrelation ist, desto intensiver ist der jeweilige Farbton. So zeigt sich exemplarisch bei den Journalist&ast;innen, dass die Items „Informationen vermitteln, die Menschen zu politischen Entscheidungen befähigen“ (RoleS) und „Menschen zur Teilhabe am politischen Geschehen motivieren“ (RoleT) in einem starken positiven Zusammenhang stehen. Gleiches gilt für die Items „ein positives Bild der Regierung vermitteln“ (RoleL) und „Regierungspolitik unterstützen“ (RoleM). Letzteres Itempaar korreliert auch [unter den Bürger&ast;innen](#Bev01) am stärksten positiv.
+
+```{r message=FALSE, warning=FALSE}
+jou_covwt <- cov.wt(jou_cl, wt = jou_na.omit$fusionweight, cor = T)
+jou_cor <- jou_covwt$cor %>% round(2)
+```
+
+```{r}
+corrplot01 <- ggcorrplot(jou_cor,
+           type = "lower",
+           lab = T,
+           title = "Gewichtete Korrelationen der Indikatorvariablen im Datensatz der Journalist*innen",
+           lab_size = 2.5,
+           ggtheme = ggplot2::theme_minimal(base_family = "Calibri"),
+           show.legend = T,
+           legend.title = "",
+           colors = c("#3ec4ae", "white", "#fad60c"))
+ggsave("corrplot01.png", corrplot01, device = "png", width = 7, height = 7)
+```
+
+<img src="corrplot01.png" width="700" height="700"/>
+
+Um zu prüfen, inwiefern sich die Daten für eine Faktorenanalyse eignen, haben wir das Kaiser-Meyer-Olkin-Kriterium (KMO) herangezogen, denn dieser Signifikanztest setzt im Gegensatz zum ebenfalls häufig genutzten Bartlett-Test auf Sphärizität keine Normalverteilung voraus. Berechnen lässt sich ein Gesamtmaß und Maße für jede einzelne Variable. Insgesamt gilt: < 0,50 = keine EFA möglich; 0,50 - 0,59 = schlecht; 0,60 - 0,69 = mäßig; 0,70 - 0,79 = mittel, 0,80 - 0,90 = gut; > 0,90 = sehr gut (Klopp 2013: 4). Beim KMO-Test liegt der Gesamtwert aufseiten der Journalist&ast;innen mit 0,86 im guten Bereich.
+
+```{r}
+kmo_jou <- KMO(jou_cor)
+kmo_jou
+```
+
+Ein Blick auf die Einzelwerte in aufsteigender Reihenfolge zeigt: Der geringste Einzelwert beträgt hier 0,64 und liegt somit über dem Minimum von 0,50 (Backhaus et al. 2018) bzw. 0,60 (Hartmann & Reinecke 2013). [Aufseiten der Bevölkerung](#Bev02) liegt der Gesamtwert bei 0,87 und der geringste Einzelwert beläuft sich auf 0,79.
+
+```{r}
+kmo_jou$MSAi %>% sort()
+```
+
+Darüber hinaus ist die Determinante der jeweiligen Korrelationsmatrix nahe null (Journalist&ast;innen = 0,0001; [Bürger&ast;innen](#Bev03) = 0,0048) und erfüllt gleichzeitig die Bedingung größer als 0,00001 zu sein (Field et al. 2012).
+
+```{r}
+det(jou_cor)
+```
+
+Um sich der Anzahl der Faktoren zu nähern, haben wir verschiedene Verfahren herangezogen: Kaiser-Guttman-Kriterium, Scree-Test und Parallelanalyse. Letzteres Verfahren vergleicht die Eigenwerte des vorliegenden Datensatzes mit normalverteilten Zufallsdaten (Bühner 2011). Wenngleich die Parallelanalyse ein genaueres Verfahren als der Scree-Test ist und eine weniger subjektive Interpretation erlaubt (Henson & Roberts 2006), sind die Ergebnisse dennoch mit Vorsicht zu interpretieren, da in keinem Sample eine Normalverteilung besteht. Die Daten der Journalist&ast;innen deuten beim Scree-Plot auf zwei Faktoren hin, die Parallelanalyse legt sechs Faktoren nahe. Der Scree-Plot für die [Bevölkerungsdaten](#Bev04) deutet auf drei und die Parallelanalyse auf fünf Faktoren hin.
+
+```{r}
+fa.parallel(jou_cor, n.obs = nrow(jou_cl), fa = "fa", fm = "uls", main = "Parallelanalyse für die Gruppe der Journalist*innen")
+```
+
+Wir haben daher mehrere Variationen der Faktorenanzahl geprüft, die Lösungen variierten hierbei zwischen zwei und sechs Faktoren. Für die Journalist&ast;innen haben wir final eine sechs-faktorielle Lösung gewählt, aufseiten der Bevölkerung eine vier-Faktoren-Lösung. Als Schätzverfahren wurde das Unweighted Least Squares (ULS)-Verfahren genutzt, weil bei dieser Methode keine Annahmen einer Normalverteilung nötig sind.
+
+Die Achsen haben wir rotiert, um eine inhaltliche Interpretation der Faktoren zu erleichtern. Die Rotation der jeweiligen Lösung zielt auf eine Einfachstruktur ab: Eine Variable lädt im Idealfall auf einen Faktor möglichst hoch und auf die übrigen deutlich schwächer (Backhaus et al. 2018), Faktoren können somit deutlicher voneinander abgegrenzt werden. Wir haben uns für eine orthogonale, also rechtwinklige, Rotation entschieden, die Faktoren bleiben also unabhängig voneinander (Korrelation = 0).
+
+Im Falle von Doppelladungen haben wir das Fürntratt-Kriterium (quadrierte Faktorladung geteilt durch die Kommunalität > 0,50) als Entscheidungshilfe bei der Zuordnung der Variablen herangezogen. Aufseiten der Journalist&ast;innen weisen zwei Items Doppelladungen > 0,40 auf. Hier lädt das Rollenitem „Informationen vermitteln, die Menschen zu politischen Entscheidungen befähigen“ (RoleS) mit 0,50 auf einen Faktor (ULS1) sowie mit 0,69 auf einen weiteren Faktor (ULS5). Die Kommunalität liegt bei 0,84. Die quadrierte Korrelation des Items mit dem Faktor ULS5 beträgt 57% der Itemkommunalität. Das Item haben wir dementsprechend diesem Faktor zugewiesen (ULS1, 30%). Das Rollenitem „Menschen zur Teilhabe am politischen Geschehen motivieren“ (RoleT) lädt aufseiten der Journalist&ast;innen ebenfalls auf ULS1 (0,41) und ULS5 (0,73) hoch. Die Kommunalität beträgt auch hier 0,84. Das Item haben wir daher dem Faktor ULS5 (63%) zugewiesen (ULS1, 20%).
+
+---
+<details>
+  <summary>Informationen zu den Komponenten des Outputs</summary>
+  <br>
+  
+Anbei gehen wir noch auf wichtige Komponenten des Outputs ein, übernommen von [Zezula und Brachem](https://pzezula.pages.gwdg.de/sheet_pca_fa.pdf).
+
+Komponente | Bedeutung | Erklärung
+--- | --- | ---
+h2 | Communality | Maß für den Anteil der Varianz der jeweiligen Variable, der durch die Faktoren des Modells erklärt werden kann.
+u2 | Uniqueness | Anteil einzigartiger Varianz der jeweiligen Variable. Berechnung als 1 - h2.
+SS loadings | Eigenvalues | Summe der quadrierten Faktorladungen pro Faktor. Werden dargestellt als Anteil erklärter Varianz. Bei 21 Variablen, wie in unserem Fall, entspricht ein eigenvalue von 2,94 (ULS1) der Erklärung von 2,94 / 21 = 0,14, also 14% der Varianz in den Daten (abgebildet im Output via Proportion Var).
+</details>
+---
+
+```{r}
+jou_varimax = fa(jou_cor, n.obs = nrow(jou_cl), nfactor = 6, fm = "uls", rotate = "varimax")
+```
+
+```{r paged.print=FALSE}
+print(jou_varimax)
+```
+
+Lösungen mit Kurzskalen haben wir nur zugelassen, wenn der Faktor sich als reliabel erwiesen hat. Ein Faktor, auf den nur zwei Variablen laden, gilt lediglich als reliabel, wenn die Variablen hoch miteinander (r > 0,70) und gleichzeitig kaum mit den übrigen Variablen korrelieren (Yong & Pearce 2013). Eine solche Kurzskala ist im sechs-Faktoren-Modell der Journalist&ast;innen vorhanden: Nur „ein positives Bild der Regierung vermitteln“ (RoleL, 0,80) und „Regierungspolitik unterstützen“ (RoleM, 0,79) laden auf einen Faktor (ULS4). Der Korrelationskoeffizient der beiden Variablen beträgt allerdings 0,72 und der nächsthöchste Wert nur r = 0,39, die Lösung haben wir somit beibehalten.
+
+```{r}
+fa.diagram(jou_varimax)
+```
+
+Die Tabelle ist sortiert nach den Eigenwerten, also der Summe der quadrierten Ladungen.
+
+```{r}
+jou_output <- fa.organize(jou_varimax$loadings,paste0("ULS", 1:6))
+jou_output <- as.data.frame(jou_output)
+jou_output <- jou_output %>%
+  rownames_to_column(var = "Variable") %>%
+  mutate(Faktor = colnames(jou_output)[apply(jou_output,1,which.max)]) %>%
+  mutate(Faktorladung = apply(jou_output,1,max)) %>%
+  select(Faktor, Faktorladung, Variable) %>%
+  mutate(
+    Anordnung = case_when(
+      Faktor == "ULS1" ~ "1",
+      Faktor == "ULS6" ~ "2",
+      Faktor == "ULS3" ~ "3",
+      Faktor == "ULS5" ~ "4",
+      Faktor == "ULS4" ~ "5",
+      Faktor == "ULS2" ~ "6",
+      TRUE ~ "Kontrolle"
+    )
+  ) %>%
+  mutate(
+    Beschreibung = case_when(
+      Faktor == "ULS1" ~ "Faktor 1",
+      Faktor == "ULS6" ~ "Faktor 2",
+      Faktor == "ULS3" ~ "Faktor 3",
+      Faktor == "ULS5" ~ "Faktor 4",
+      Faktor == "ULS4" ~ "Faktor 5",
+      Faktor == "ULS2" ~ "Faktor 6",
+      TRUE ~ "Kontrolle"
+    )
+  ) %>%
+  arrange(Anordnung, desc(Faktorladung)) %>%
+  mutate_if(is.numeric, ~round(., 2))
+jou_viz <- full_join(jou_output, label, by = "Variable") %>% select(Beschreibung, Faktorladung, Label, Variable) %>% dplyr::rename("Rollenitem" = "Label")
+kable(jou_viz, format = "html", escape = FALSE) %>%
+  kable_styling(bootstrap_options = c("condensed", "responsive")) %>%
+  collapse_rows(columns = 1, valign = "top")
+write.csv2(jou_viz, "jou_tbl.csv")
+```
+
+# Bevölkerung
+
+```{r include=FALSE}
+rm(list=ls())
+```
+
+```{r include=FALSE}
+df <- read_spss("JPubRepFusionWoJ.sav")
+```
+
+```{r include=FALSE}
+ri <- df %>%
+  distinct(ID, .keep_all = T) %>%
+  select(3:4, 13:33)
+```
+
+```{r include=FALSE}
+label_list <- labelled::var_label(ri)
+label <- data.frame(Variable = names(label_list), Label_eng = unlist(label_list))
+rm(label_list)
+label <- label %>%
+  filter(Variable != "dataset" & Variable != "fusionweight") %>%
+  mutate_if(is.factor, as.character) %>%
+  mutate(
+    Label = case_when(
+      Label_eng == "Be a detached observer." ~ "Ein unparteiischer Beobachter sein",
+      Label_eng == "Report things as they are." ~ "Dinge so berichten, wie sie sind",
+      Label_eng == "Provide analysis of current affairs." ~ "Aktuelles Geschehen einordnen und analysieren",
+      Label_eng == "Monitor and scrutinize political leaders." ~ "Die Regierung kontrollieren",
+      Label_eng == "Monitor and scrutinize business." ~ "Die Wirtschaft kontrollieren",
+      Label_eng == "Set the political agenda." ~ "Die politische Tagesordnung bestimmen",
+      Label_eng == "Influence public opinion." ~ "Die öffentliche Meinung beeinflussen",
+      Label_eng == "Advocate for social change." ~ "Für sozialen Wandel eintreten",
+      Label_eng == "Be an adversary of the government." ~ "Ein Gegengewicht zur Regierung bilden",
+      Label_eng == "Support national development." ~ "Nationale Entwicklung unterstützen",
+      Label_eng == "Convey a positive image of political leadership." ~ "Ein positives Bild der Regierung vermitteln",
+      Label_eng == "Support government policy." ~ "Regierungspolitik unterstützen",
+      Label_eng == "Provide entertainment and relaxation." ~ "Unterhaltung und Entspannung bieten",
+      Label_eng == "Provide the kind of news that attracts the largest audience." ~ "Inhalte anbieten, die ein möglichst großes Publikum anziehen",
+      Label_eng == "Provide advice, orientation and direction for daily life." ~ "Rat, Orientierung und Hilfestellung für den Alltag bieten",
+      Label_eng == "Provide information people need to make political decisions." ~ "Informationen vermitteln, die Menschen zu politischen Entscheidungen befähigen",
+      Label_eng == "Motivate people to participate in political activity." ~ "Menschen zur Teilhabe am politischen Geschehen motivieren",
+      Label_eng == "Let people express their views." ~ "Den Menschen die Möglichkeit geben, ihre Ansichten zu artikulieren",
+      Label_eng == "Educate the audience." ~ "Das Publikum bilden",
+      Label_eng == "Tell stories about the world." ~ "Als Erzähler die Welt in Geschichten vermitteln",
+      Label_eng == "Promote tolerance and cultural diversity." ~ "Toleranz und kulturelle Vielfalt fördern",
+      TRUE ~ "Kontrolle"
+    )
+  )
+```
+
+```{r}
+aud <- ri %>% filter(dataset == 1)
+val_labels(aud) <- NULL
+aud_na.omit <- na.omit(aud)
+aud_cl <- aud_na.omit %>% select(3:23)
+```
+
+```{r message=FALSE, warning=FALSE}
+aud_covwt <- cov.wt(aud_cl, wt = aud_na.omit$fusionweight, cor = T)
+```
+
+```{r}
+aud_cor <- aud_covwt$cor %>% round(2)
+```
+
+<a id="Bev01"></a>
+```{r}
+corrplot02 <- ggcorrplot(aud_cor,
+           type = "lower",
+           lab = T,
+           title = "Gewichtete Korrelationen der Indikatorvariablen im Bevölkerungs-Datensatz",
+           lab_size = 2.5,
+           ggtheme = ggplot2::theme_minimal(base_family = "Calibri"),
+           show.legend = T,
+           legend.title = "",
+           colors = c("#3ec4ae", "white", "#fad60c"))
+ggsave("corrplot02.png", corrplot02, device = "png", width = 7, height = 7)
+```
+
+<img src="corrplot02.png" width="700" height="700"/>
+
+<a id="Bev02"></a>
+```{r}
+kmo_aud <- KMO(aud_cor)
+kmo_aud
+```
+
+```{r}
+kmo_aud$MSAi %>% sort()
+```
+
+<a id="Bev03"></a>
+```{r}
+det(aud_cor)
+```
+
+<a id="Bev04"></a>
+```{r}
+fa.parallel(aud_cor, n.obs = nrow(aud_cl), fa = "fa", fm = "uls", main = "Parallelanalyse für die Gruppe der Bürger*innen")
+```
+
+```{r}
+aud_varimax = fa(aud_cor, n.obs = nrow(aud_cl), nfactor = 4, fm = "uls", rotate = "varimax")
+```
+
+```{r paged.print=FALSE}
+print(aud_varimax)
+```
+
+```{r}
+fa.diagram(aud_varimax)
+```
+
+```{r}
+aud_output <- fa.organize(aud_varimax$loadings,paste0("ULS", 1:4))
+aud_output <- as.data.frame(aud_output)
+aud_output <- aud_output %>%
+  rownames_to_column(var = "Variable") %>%
+  mutate(Faktor = colnames(aud_output)[apply(aud_output,1,which.max)]) %>%
+  mutate(Faktorladung = apply(aud_output,1,max)) %>%
+  select(Faktor, Faktorladung, Variable) %>%
+  mutate(
+    Anordnung = case_when(
+      Faktor == "ULS4" ~ "1",
+      Faktor == "ULS1" ~ "2",
+      Faktor == "ULS2" ~ "3",
+      Faktor == "ULS3" ~ "4",
+      TRUE ~ "Kontrolle"
+    )
+  ) %>%
+  mutate(
+    Beschreibung = case_when(
+      Faktor == "ULS4" ~ "Ermächtigendes Berichten und Einordnen",
+      Faktor == "ULS1" ~ "Orientierende Unterhaltung und Hilfestellung",
+      Faktor == "ULS2" ~ "Regierungsunterstützendes Agenda Setting",
+      Faktor == "ULS3" ~ "Kontrolle Mächtiger",
+      TRUE ~ "Kontrolle"
+    )
+  ) %>%
+  arrange(Anordnung, desc(Faktorladung)) %>%
+  mutate_if(is.numeric, ~round(., 2))
+aud_viz <- full_join(aud_output, label, by = "Variable") %>% select(Beschreibung, Faktor, Faktorladung, Label, Variable) %>% dplyr::rename("Rollenitem" = "Label") 
+kable(aud_viz, format = "html", escape = FALSE) %>%
+  kable_styling(bootstrap_options = c("condensed", "responsive")) %>%
+  collapse_rows(columns = 1, valign = "top")
+write.csv2(aud_viz, "aud_tbl.csv")
+```
+
+# Pakete
+
+Kassambara, A. (2019). ggcorrplot: visualization of a correlation matrix using 'ggplot2'. R package version 0.1.3. https://CRAN.R-project.org/package=ggcorrplot.
+
+Larmarange, J. (2020). labelled: manipulating labelled data. R package version 2.7.0. https://CRAN.R-project.org/package=labelled.
+  
+Müller, K., & Wickham, H. (2021). tibble: simple data frames. R package version 3.0.5. https://CRAN.R-project.org/package=tibble.
+
+Revelle, W. (2020). psych: procedures for personality and psychological research, Northwestern University. https://CRAN.R-project.org/package=psych.
+
+Wickham, H. (2016). ggplot2: elegant graphics for data analysis. Springer.
+
+Wickham, H., François, R., Henry, L., & Müller, K. (2022). dplyr: a grammar of data manipulation. R package version 1.0.9. https://CRAN.R-project.org/package=dplyr.
+
+Wickham, H., & Miller, E. (2020). haven: import and export 'SPSS', 'Stata' and 'SAS' files. R package version 2.3.1. https://CRAN.R-project.org/package=haven.
+
+Zhu, H. (2020). kableExtra: construct complex table with 'kable' and pipe syntax. R package version 1.3.1. https://CRAN.R-project.org/package=kableExtra.
+
+"R version 4.0.5 (2021-03-31)"
+
+# Literatur
+
+Backhaus, K., Erichson, B., Plinke, W., & Weiber, R. (2018). *Multivariate Analysemethoden. Eine anwendungsorientierte Einführung*. Springer.
+
+Bühner, M. (2011). *Einführung in die Test-und Fragebogenkonstruktion*. Pearson.
+
+Comrey, A.L., & Lee, H.B. (1992). *A First Course in Factor Analysis* (2nd ed.). Psychology Press.
+
+Field, A., Miles, J., & Field, Z. (2012). *Discovering Statistics Using R*. Sage Publications.
+
+Fricker, R. D., Kulzy, W. W., & Appleget, J. A. (2012). From data to information: using factor analysis with survey data. *Phalanx*, 45(4), 30-34.
+
+Hanitzsch, T., Vos, T. P., Standaert, O., Hanusch, F., Hovden, J. F., Hermans, L., & Ramaprasad, J. (2019). Role orientations: journalists’ views on their place in society. In T. Hanitzsch, F. Hanusch, J. Ramaprasad, & A. S. de Beer (Hg.), *Worlds of journalism. Journalistic Cultures around the Globe* (161–197). Columbia University Press. 
+
+Hartmann, T., & Reinecke, L. (2013). Skalenkonstruktion in der Kommunikationswissenschaft. In W. Möhring & D. Schlütz (Hg.), *Handbuch standardisierte Erhebungsmethoden der Kommunikationswissenschaft* (41-60). Springer.
+
+Henson, R. K., & Roberts, J. K. (2006). Use of exploratory factor analysis in published research: common errors and some comment on improved practice. *Educational and Psychological Measurement*, 66(3), 393–416.
+
+Klopp, E. (2013). *Explorative Faktorenanalyse*. https://psydok.psycharchives.de/jspui/bitstream/20.500.11780/3369/1/Explorative_Faktorenanalyse_final.pdf [13.07.2022].
+
+Völkl, K., & Korb, C. (2018). *Deskriptive Statistik. Eine Einführung für Politikwissenschaftlerinnen und Politikwissenschaftler*. Springer.
+
+Yong, A. G., & Pearce, S. (2013). A beginner’s guide to factor analysis: focusing on exploratory factor analysis. *Tutorials in Quantitative Methods for Psychology*, 9(2), 79-94. 
